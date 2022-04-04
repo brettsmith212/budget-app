@@ -4,6 +4,6 @@
 
 ### ToDo
 
-- [] Create a backend connected to Plaid
-- [] Create a front end to display transactions and budget
-- [] Create a notification system via email, text, or whatsapp
+- [ ] Create a backend connected to Plaid
+- [ ] Create a front end to display transactions and budget
+- [ ] Create a notification system via email, text, or whatsapp
