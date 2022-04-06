@@ -1,6 +1,6 @@
-import { createGlobalStyle } from "styled-components";
+import { createGlobalStyle, DefaultTheme } from "styled-components";
 
-const GlobalStyles = createGlobalStyle`
+const GlobalStyles = createGlobalStyle<{ theme: DefaultTheme }>`
 html,
 body,
 div,
@@ -81,7 +81,7 @@ html {
 body {
   font-family: 'Poppins', sans-serif;
   background: ${({ theme }) => theme.colors.body};
-  color: ${({ theme }) => theme.colors.fontColor};
+  color: ${({ theme }) => theme.colors.fontDefault};
   line-height: 1.5;
 }
 input {

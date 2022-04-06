@@ -3,15 +3,17 @@ import "styled-components";
 declare module "styled-components" {
   export interface DefaultTheme {
     colors: {
-      header: string;
-      body: string;
-      section: string;
-      card: string;
-      footer: string;
-      fontColostring;
+      bgHeader: string;
+      bgBody: string;
+      bgSection: string;
+      bgCard: string;
+      bgFooter: string;
+      fontDefault: string;
+      fontGreen: string;
+      fontLightGreen: string;
+      fontDarkGreen: string;
       hr: string;
-      modal: string;
-      voted: string;
+      bgModal: string;
     };
     fontSize: {
       input: string;
