@@ -80,7 +80,7 @@ html {
 }
 body {
   font-family: 'Poppins', sans-serif;
-  background: ${({ theme }) => theme.colors.body};
+  background: ${({ theme }) => theme.colors.bgBody};
   color: ${({ theme }) => theme.colors.fontDefault};
   line-height: 1.5;
 }
@@ -89,7 +89,7 @@ input {
 }
 a {
   text-decoration: none;
-  color: ${({ theme }) => theme.colors.fontColor};
+  color: ${({ theme }) => theme.colors.fontDefault};
 }
 `;
 
