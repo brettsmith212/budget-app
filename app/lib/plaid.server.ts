@@ -12,17 +12,18 @@
  *
  * @dependencies
  * - plaid: Plaid API client library for interacting with Plaid services
- * - ~/lib/supabase.server: Supabase client for database operations
+ * - @supabase/supabase-js: Supabase client type for authenticated operations
  *
  * @notes
  * - Requires PLAID_CLIENT_ID, PLAID_SECRET, and PLAID_ENV environment variables in .env.local
- * - Assumes the accounts table has an access_token column (to be added by the user if missing)
+ * - Assumes the accounts table has an access_token column
  * - Handles errors by throwing exceptions to be caught by calling functions
  * - Uses server-side only logic to protect sensitive operations
+ * - Now accepts an authenticated Supabase client to respect RLS policies
  */
 
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
-import { supabase } from './supabase.server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Initialize Plaid client with environment variables
 const configuration = new Configuration({
@@ -66,13 +67,15 @@ export async function createLinkToken(userId: string): Promise<string> {
  * @param publicToken - The public token received from Plaid Link on successful connection
  * @param institutionName - The name of the financial institution from Plaid metadata
  * @param userId - The unique identifier of the user from Supabase
+ * @param supabaseClient - Authenticated Supabase client to respect RLS policies
  * @returns A promise that resolves when the operation is complete
  * @throws Error if token exchange, account retrieval, or database insertion fails
  */
 export async function exchangePublicToken(
   publicToken: string,
   institutionName: string,
-  userId: string
+  userId: string,
+  supabaseClient: SupabaseClient
 ): Promise<void> {
   try {
     // Exchange public token for access token
@@ -87,9 +90,9 @@ export async function exchangePublicToken(
     });
     const accounts = accountsResponse.data.accounts;
 
-    // Save each account to Supabase
+    // Save each account to Supabase using the authenticated client
     for (const account of accounts) {
-      const { error } = await supabase.from('accounts').insert({
+      const { error } = await supabaseClient.from('accounts').insert({
         user_id: userId,
         access_token: accessToken, // Stored for future transaction syncs
         plaid_account_id: account.account_id, // Unique identifier from Plaid
@@ -103,7 +106,7 @@ export async function exchangePublicToken(
       }
     }
   } catch (error) {
-    // Handle Plaid API errors (e.g., invalid token, rate limits) or Supabase errors (e.g., unique constraint violation)
+    // Handle Plaid API errors (e.g., invalid token, rate limits) or Supabase errors (e.g., RLS violation)
     throw new Error('Failed to exchange public token: ' + (error instanceof Error ? error.message : 'Unknown error'));
   }
 }

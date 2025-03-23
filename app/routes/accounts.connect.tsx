@@ -21,7 +21,7 @@
  *
  * @notes
  * - Requires authentication; redirects to /auth/login if user is not authenticated
- * - Assumes the accounts table has an access_token column (user must have added this)
+ * - Assumes the accounts table has an access_token column
  * - Redirects to the dashboard (/) on successful connection
  * - Uses Tailwind CSS classes for dark theme consistency
  * - Renamed to accounts.connect.tsx to follow Remix dot notation for route hierarchy
@@ -58,7 +58,11 @@ export const loader: LoaderFunction = async ({ request }) => {
  * @throws Redirect to /auth/login if user is not authenticated
  */
 export const action: ActionFunction = async ({ request }) => {
-  const { user } = await requireUser(request); // Enforces authentication
+  const { user, supabase } = await requireUser(request); // Get authenticated user and client
+  if (!supabase) {
+    throw new Error('Supabase client not initialized for authenticated user');
+  }
+
   const formData = await request.formData();
   const publicToken = formData.get('publicToken');
   const institutionName = formData.get('institutionName');
@@ -69,7 +73,7 @@ export const action: ActionFunction = async ({ request }) => {
   }
 
   try {
-    await exchangePublicToken(publicToken, institutionName, user.id);
+    await exchangePublicToken(publicToken, institutionName, user.id, supabase);
     return redirect('/'); // Redirect to dashboard on success
   } catch (error) {
     // Handle Plaid or Supabase errors
