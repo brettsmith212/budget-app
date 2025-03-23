@@ -82,18 +82,18 @@ CREATE POLICY "Users can only access their own bitcoin prices" ON bitcoin_prices
   FOR ALL USING (auth.uid() = user_id);
 Authentication
 ```
-[ ] Step 3: Implement Supabase authentication
+[x] Step 3: Implement Supabase authentication
 Task: Set up the Supabase client and implement login/logout functionality to secure the app for exclusive use.
 Files:
 app/lib/supabase.server.ts: Create Supabase client for server-side use with environment variables.
-app/routes/auth/login.tsx: Create a login page with a form to authenticate users via Supabase.
-app/routes/auth/logout.tsx: Create a logout action to sign out users.
+app/routes/auth.login.tsx: Create a login page with a form to authenticate users via Supabase.
+app/routes/auth.logout.tsx: Create a logout action to sign out users.
 app/components/auth-provider.tsx: Create an authentication provider component to manage session state.
 app/hooks/use-auth.ts: Create a hook to access authentication state in components.
 Step Dependencies: Step 2
 User Instructions: None
 Layout and Navigation
-[ ] Step 4: Implement basic layout with sidebar
+[x] Step 4: Implement basic layout with sidebar
 Task: Create a dashboard layout with a sidebar for navigation, using a dark theme and Tailwind CSS.
 Files:
 app/components/layout/dashboard-layout.tsx: Create a layout component with a sidebar and main content area.
