@@ -10,7 +10,7 @@ Categorizing transactions as income or spending.
 Calculating cash flow for monthly, quarterly, and yearly periods.
 Fetching real-time Bitcoin prices every 15 minutes.
 Exporting transaction data and cash flow summaries to CSV.
-System Architecture: Built with Remix for full-stack web development, using Supabase for data storage and authentication, Plaid for financial account integration, and an external API (e.g., CoinGecko) for Bitcoin prices. The frontend leverages Tailwind CSS for styling and Shadcn for UI components, optimized for a minimalistic SaaS dashboard style with a dark theme.
+System Architecture: Built with Remix v2 for full-stack web development, using Supabase for data storage and authentication, Plaid for financial account integration, and an external API (e.g., CoinGecko) for Bitcoin prices. The frontend leverages Tailwind CSS for styling and Shadcn for UI components, optimized for a minimalistic SaaS dashboard style with a dark theme.
 2. Project Structure
 Detailed Breakdown of Project Structure & Organization:
 ```

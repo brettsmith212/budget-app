@@ -1,5 +1,5 @@
 Project Setup
-[ ] Step 1: Initialize project and install dependencies
+[x] Step 1: Initialize project and install dependencies
 Task: Set up the Remix project and install required libraries to prepare the development environment.
 Files: None (user action)
 Step Dependencies: None
@@ -20,7 +20,7 @@ PLAID_ENV=sandbox (or development/production)
 BITCOIN_API_URL=https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd
 ```
 Update .env.example with the above variables.
-[ ] Step 2: Set up Supabase database schema and RLS policies
+[x] Step 2: Set up Supabase database schema and RLS policies
 Task: Create the necessary database tables in Supabase and configure Row-Level Security (RLS) to restrict access to the authenticated user.
 Files: None (user action)
 Step Dependencies: Step 1
