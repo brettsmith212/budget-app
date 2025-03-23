@@ -102,7 +102,7 @@ app/root.tsx: Update the root component to use the dashboard layout and protect 
 Step Dependencies: Step 3
 User Instructions: None
 Account Integration
-[ ] Step 5: Implement Plaid account connection
+[x] Step 5: Implement Plaid account connection
 Task: Set up the Plaid client and create a route to connect Betterment and Chase Credit Card accounts using Plaid Link.
 Files:
 app/lib/plaid.server.ts: Create a Plaid client with functions to exchange public tokens for access tokens and save to the accounts table.

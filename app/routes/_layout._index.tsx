@@ -18,13 +18,19 @@
  * - Optimized for dark theme with Tailwind classes from tailwind.css
  */
 
-import type { MetaFunction } from '@remix-run/node';
+import type { MetaFunction, LoaderFunction } from '@remix-run/node';
+import { requireUser } from '~/lib/supabase.server';
 
 export const meta: MetaFunction = () => {
   return [
     { title: 'Personal Finance Dashboard' },
     { name: 'description', content: 'Overview of your personal finances' },
   ];
+};
+
+export const loader: LoaderFunction = async ({ request }) => {
+  await requireUser(request);
+  return null;
 };
 
 export default function Overview() {

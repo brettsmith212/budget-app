@@ -18,13 +18,19 @@
  * - Uses Tailwind classes for dark theme consistency with dashboard-layout.tsx
  */
 
-import type { MetaFunction } from '@remix-run/node';
+import type { MetaFunction, LoaderFunction } from '@remix-run/node';
+import { requireUser } from '~/lib/supabase.server';
 
 export const meta: MetaFunction = () => {
   return [
     { title: 'Cash Flow - Personal Finance Dashboard' },
     { name: 'description', content: 'View your cash flow over multiple periods' },
   ];
+};
+
+export const loader: LoaderFunction = async ({ request }) => {
+  await requireUser(request);
+  return null;
 };
 
 export default function CashFlow() {
