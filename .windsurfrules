@@ -1,0 +1,235 @@
+# Project Instructions
+
+Use specification and guidelines as you build the app.
+
+Write the complete code for every step. Do not get lazy.
+
+Your goal is to completely finish whatever I ask for.
+
+You will see <ai_context> tags in the code. These are context tags that you should use to help you understand the codebase.
+
+## Overview
+
+This is a web app template.
+
+## Tech Stack
+
+- Frontend: Remix, Tailwind, Shadcn, Framer Motion
+- Backend: Postgres, Supabase, Remix Server Actions
+- Auth: Supabase Authentication
+
+## Project Structure Example
+
+my-remix-app/
+├── app/
+│   ├── routes/
+│   │   ├── _index.tsx         # Root route (e.g., homepage)
+│   │   ├── about.tsx          # Static route (e.g., /about)
+│   │   ├── posts/
+│   │   │   ├── $postId.tsx    # Dynamic route (e.g., /posts/:postId)
+│   │   │   └── index.tsx      # Posts index route (e.g., /posts)
+│   │   └── contact.tsx        # Route with server action (e.g., /contact)
+│   ├── components/            # Reusable UI components (optional)
+│   │   ├── Header.tsx
+│   │   └── FormComponent.tsx
+│   ├── lib/                   # Utility functions or server-side logic (optional)
+│   │   └── database.server.ts # Server-only code (e.g., DB access)
+│   ├── root.tsx               # Root layout component
+│   ├── entry.client.tsx       # Client-side entry point
+│   └── entry.server.tsx       # Server-side entry point
+├── public/                    # Static assets (images, fonts, etc.)
+│   ├── favicon.ico
+│   └── logo.png
+├── types/                     # Type definitions
+├── package.json               # Project dependencies and scripts
+└── tsconfig.json              # TypeScript config (if using TypeScript)
+
+## Rules
+
+Follow these rules when building the app.
+
+### General Rules
+
+- Use `@` to import anything from the app unless otherwise specified
+- Use kebab case for all files and folders unless otherwise specified
+- Don't update shadcn components unless otherwise specified
+
+#### Env Rules
+
+- If you update environment variables, update the `.env.example` file
+- All environment variables should go in `.env.local`
+- Do not expose environment variables to the frontend
+- You may import environment variables in server actions and components by using `process.env.VARIABLE_NAME`
+
+#### Type Rules
+
+Follow these rules when working with types.
+
+- When importing types, use `@/types`
+- Name files like `example-types.ts`
+- All types should go in `types`
+- Make sure to export the types in `types/index.ts`
+- Prefer interfaces over type aliases
+
+An example of a type:
+
+`types/actions-types.ts`
+
+```ts
+export type ActionState<T> =
+  | { isSuccess: true; message: string; data: T }
+  | { isSuccess: false; message: string; data?: never }
+```
+
+And exporting it:
+
+`types/index.ts`
+
+```ts
+export * from "./actions-types"
+```
+
+### Frontend Rules
+
+Follow these rules when working on the frontend.
+
+It uses Remix, Tailwind, Shadcn, and Framer Motion.
+
+#### General Rules
+
+- Use `lucide-react` for icons
+- useSidebar must be used within a SidebarProvider
+
+#### Components
+
+- Use divs instead of other html tags unless otherwise specified
+- Separate the main parts of a component's html with an extra blank line for visual spacing
+
+##### Organization
+
+- All components be named using kebab case like `example-component.tsx` unless otherwise specified
+
+##### Data Fetching
+
+- Fetch data in server components and pass the data down as props to client components.
+
+### Backend Rules
+
+Follow these rules when working on the backend.
+
+It uses Postgres, Supabase and Remix Server Actions
+
+# Storage Rules
+
+Follow these rules when working with Supabase Storage.
+
+It uses Supabase Storage for file uploads, downloads, and management.
+
+## General Rules
+
+- Always use environment variables for bucket names to maintain consistency across environments
+- Never hardcode bucket names in the application code
+- Always handle file size limits and allowed file types at the application level
+- Use the `upsert` method instead of `upload` when you want to replace existing files
+- Always implement proper error handling for storage operations
+- Use content-type headers when uploading files to ensure proper file handling
+
+## Organization
+
+### Buckets
+
+- Name buckets in kebab-case: `user-uploads`, `profile-images`
+- Create separate buckets for different types of files (e.g., `profile-images`, `documents`, `attachments`)
+- Document bucket purposes in a central location
+- Set appropriate bucket policies (public/private) based on access requirements
+- Implement RLS (Row Level Security) policies for buckets that need user-specific access
+- Make sure to let me know instructions for setting up RLS policies on Supabase since you can't do this yourself, including the SQL scripts I need to run in the editor
+
+### File Structure
+
+- Organize files in folders based on their purpose and ownership
+- Use predictable, collision-resistant naming patterns
+- Structure: `{bucket}/{userId}/{purpose}/{filename}`
+- Example: `profile-images/123e4567-e89b/avatar/profile.jpg`
+- Include timestamps in filenames when version history is important
+- Example: `documents/123e4567-e89b/contracts/2024-02-13-contract.pdf`
+
+## File Handling
+
+### Upload Rules
+
+- Always validate file size before upload
+- Implement file type validation using both extension and MIME type
+- Generate unique filenames to prevent collisions
+- Set appropriate content-type headers
+- Handle existing files appropriately (error or upsert)
+
+Example validation:
+
+```ts
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
+function validateFile(file: File): boolean {
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error("File size exceeds limit")
+  }
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    throw new Error("File type not allowed")
+  }
+
+  return true
+}
+```
+
+### Download Rules
+
+- Always handle missing files gracefully
+- Implement proper error handling for failed downloads
+- Use signed URLs for private files
+
+### Delete Rules
+
+- Implement soft deletes when appropriate
+- Clean up related database records when deleting files
+- Handle bulk deletions carefully
+- Verify ownership before deletion
+- Always delete all versions/transforms of a file
+
+## Security
+
+### Bucket Policies
+
+- Make buckets private by default
+- Only make buckets public when absolutely necessary
+- Use RLS policies to restrict access to authorized users
+- Example RLS policy:
+
+```sql
+CREATE POLICY "Users can only access their own files"
+ON storage.objects
+FOR ALL
+USING (auth.uid()::text = (storage.foldername(name))[1]);
+```
+
+### Access Control
+
+- Generate short-lived signed URLs for private files
+- Implement proper CORS policies
+- Use separate buckets for public and private files
+- Never expose internal file paths
+- Validate user permissions before any operation
+
+## Error Handling
+
+- Implement specific error types for common storage issues
+- Always provide meaningful error messages
+- Implement retry logic for transient failures
+- Log storage errors separately for monitoring
+
+## Optimization
+
+- Implement progressive upload for large files
+- Clean up temporary files and failed uploads
+- Use batch operations when handling multiple files
