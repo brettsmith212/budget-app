@@ -2,13 +2,14 @@
  * @file Plaid client and utility functions for server-side use
  * @description
  * This module initializes the Plaid client with environment variables and provides functions
- * to create link tokens and exchange public tokens for access tokens, saving account details
- * to Supabase. It supports connecting financial accounts like Betterment and Chase Credit Card.
+ * to create link tokens, exchange public tokens for access tokens, and sync transactions.
+ * It supports connecting financial accounts and syncing transactions for those accounts.
  *
  * Key features:
  * - Initializes Plaid client with client ID, secret, and environment
  * - Creates link tokens for Plaid Link initialization
  * - Exchanges public tokens for access tokens and saves account details to Supabase
+ * - Syncs transactions from Plaid for all accounts of the user
  *
  * @dependencies
  * - plaid: Plaid API client library for interacting with Plaid services
@@ -19,10 +20,10 @@
  * - Assumes the accounts table has an access_token column
  * - Handles errors by throwing exceptions to be caught by calling functions
  * - Uses server-side only logic to protect sensitive operations
- * - Now accepts an authenticated Supabase client to respect RLS policies
+ * - Sync function assumes sync_cursors and transactions tables are updated per user instructions
  */
 
-import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
+import { Configuration, PlaidApi, PlaidEnvironments, Transaction, RemovedTransaction } from 'plaid';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Initialize Plaid client with environment variables
@@ -108,5 +109,118 @@ export async function exchangePublicToken(
   } catch (error) {
     // Handle Plaid API errors (e.g., invalid token, rate limits) or Supabase errors (e.g., RLS violation)
     throw new Error('Failed to exchange public token: ' + (error instanceof Error ? error.message : 'Unknown error'));
+  }
+}
+
+/**
+ * Determine the category ('income', 'spending', 'transfer') based on Plaid transaction and account type
+ * @param transaction - The Plaid transaction object
+ * @param accountType - The type of the account ('depository', 'credit', etc.)
+ * @returns The category string
+ */
+function determineCategory(transaction: Transaction, accountType: string): 'income' | 'spending' | 'transfer' {
+  if (transaction.category && transaction.category.includes('Transfer')) {
+    return 'transfer';
+  }
+  if (accountType === 'depository' || accountType === 'investment') {
+    return transaction.amount > 0 ? 'income' : 'spending';
+  }
+  if (accountType === 'credit') {
+    return transaction.amount > 0 ? 'spending' : 'income';
+  }
+  return 'spending';
+}
+
+/**
+ * Sync transactions from Plaid for all accounts of the user
+ * @param userId - The user's ID
+ * @param supabaseClient - Authenticated Supabase client
+ * @returns Promise that resolves when sync is complete
+ * @throws Error if database queries or Plaid API calls fail
+ */
+export async function syncTransactions(userId: string, supabaseClient: SupabaseClient) {
+  // Get all accounts for the user
+  const { data: accounts, error: accountsError } = await supabaseClient
+    .from('accounts')
+    .select('id, access_token, plaid_account_id, account_type')
+    .eq('user_id', userId);
+
+  if (accountsError) throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
+
+  const accessTokens = [...new Set(accounts.map(a => a.access_token))]; // Deduplicate access tokens
+
+  for (const accessToken of accessTokens) {
+    // Get current cursor for this access token
+    const { data: cursorData } = await supabaseClient
+      .from('sync_cursors')
+      .select('cursor')
+      .eq('user_id', userId)
+      .eq('access_token', accessToken)
+      .single();
+
+    let cursor = cursorData ? cursorData.cursor : null;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await plaidClient.transactionsSync({
+        access_token: accessToken,
+        cursor,
+      });
+
+      const { added, modified, removed, next_cursor } = response.data;
+
+      // Process added transactions
+      for (const tx of added) {
+        const account = accounts.find(a => a.plaid_account_id === tx.account_id);
+        if (!account) continue; // Skip if account not found
+        const category = determineCategory(tx, account.account_type);
+        const { error } = await supabaseClient.from('transactions').insert({
+          user_id: userId,
+          account_id: account.id,
+          plaid_transaction_id: tx.transaction_id,
+          date: tx.date,
+          amount: tx.amount,
+          category,
+          description: tx.name,
+        });
+        if (error) throw new Error(`Failed to insert transaction ${tx.transaction_id}: ${error.message}`);
+      }
+
+      // Process modified transactions
+      for (const tx of modified) {
+        const account = accounts.find(a => a.plaid_account_id === tx.account_id);
+        if (!account) continue;
+        const category = determineCategory(tx, account.account_type);
+        const { error } = await supabaseClient.from('transactions').update({
+          date: tx.date,
+          amount: tx.amount,
+          category,
+          description: tx.name,
+        }).eq('plaid_transaction_id', tx.transaction_id).eq('account_id', account.id);
+        if (error) throw new Error(`Failed to update transaction ${tx.transaction_id}: ${error.message}`);
+      }
+
+      // Process removed transactions
+      const accountIds = accounts.filter(a => a.access_token === accessToken).map(a => a.id);
+      for (const removedTx of removed) {
+        const { error } = await supabaseClient.from('transactions')
+          .delete()
+          .eq('plaid_transaction_id', removedTx.transaction_id)
+          .in('account_id', accountIds);
+        if (error) throw new Error(`Failed to delete transaction ${removedTx.transaction_id}: ${error.message}`);
+      }
+
+      // Update cursor for next iteration or completion
+      cursor = next_cursor;
+      hasMore = response.data.has_more;
+    }
+
+    // Save the final cursor
+    const { error: cursorError } = await supabaseClient.from('sync_cursors').upsert({
+      user_id: userId,
+      access_token: accessToken,
+      cursor,
+    }, { onConflict: 'user_id,access_token' });
+    if (cursorError) throw new Error(`Failed to update sync cursor: ${cursorError.message}`);
   }
 }
