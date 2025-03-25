@@ -153,9 +153,9 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
                   required
                   className="text-base text-center"
                 />
-                <input 
-                  type="hidden" 
-                  name="amount" 
+                <input
+                  type="hidden"
+                  name="amount"
                   value={isIncome ? Math.abs(parseFloat(amount || "0")) : -Math.abs(parseFloat(amount || "0"))}
                 />
                 <div className="flex space-x-2">

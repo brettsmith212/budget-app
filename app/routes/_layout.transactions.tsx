@@ -8,7 +8,7 @@
  */
 
 import { json } from "@remix-run/node";
-import { useLoaderData, useRevalidator } from "@remix-run/react";
+import { useLoaderData, useRevalidator, Form } from "@remix-run/react";
 import { format, parseISO } from "date-fns";
 import { useState } from "react";
 import { requireUser } from "~/lib/supabase.server";
@@ -30,7 +30,18 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { ArrowUpDown, Search } from "lucide-react";
+import { ArrowUpDown, Search, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
+import { Button } from "~/components/ui/button";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import type { Transaction, TransactionFormData, ActionState } from "@/types";
 
@@ -163,6 +174,38 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
+  // Handle transaction deletion
+  if (_action === "deleteTransaction") {
+    const transactionId = formData.get("transactionId") as string;
+    
+    if (!transactionId) {
+      return json<ActionState<null>>({
+        isSuccess: false,
+        message: "Transaction ID is required for deletion.",
+      });
+    }
+
+    const { error } = await supabase
+      .from("transactions")
+      .delete()
+      .eq("id", transactionId)
+      .eq("user_id", user.id); // Ensure user can only delete their own transactions
+
+    if (error) {
+      console.error("Error deleting transaction:", error);
+      return json<ActionState<null>>({
+        isSuccess: false,
+        message: "Failed to delete transaction. Please try again.",
+      });
+    }
+
+    return json<ActionState<null>>({
+      isSuccess: true,
+      message: "Transaction deleted successfully!",
+      data: null
+    });
+  }
+
   return null;
 }
 
@@ -173,6 +216,8 @@ export default function TransactionsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortField, setSortField] = useState<keyof Transaction>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   // Handle sorting
   const handleSort = (field: keyof Transaction) => {
@@ -367,13 +412,14 @@ export default function TransactionsPage() {
                   <ArrowUpDown className="ml-2 h-4 w-4 inline" />
                 )}
               </TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
             {filteredAndSortedTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center">
+                <TableCell colSpan={5} className="h-24 text-center">
                   {searchTerm || categoryFilter !== "all"
                     ? "No matching transactions found."
                     : "No transactions yet. Add one using the form above."}
@@ -402,12 +448,56 @@ export default function TransactionsPage() {
                     {transaction.amount >= 0 ? "+" : ""}
                     ${Math.abs(transaction.amount).toFixed(2)}
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedTransaction(transaction);
+                        setDeleteDialogOpen(true);
+                      }}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this transaction? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedTransaction(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <Form method="post">
+              <input type="hidden" name="transactionId" value={selectedTransaction?.id} />
+              <input type="hidden" name="_action" value="deleteTransaction" />
+              <AlertDialogAction
+                type="submit"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setSelectedTransaction(null);
+                }}
+                className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
+              >
+                Delete
+              </AlertDialogAction>
+            </Form>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
