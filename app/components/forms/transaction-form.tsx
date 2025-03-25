@@ -115,28 +115,6 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
     }
   }, [actionData, onSuccess]);
 
-  // Handle amount sign based on income/expense selection
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    // Transform the amount based on income/expense
-    const formattedAmount = isIncome
-      ? Math.abs(parseFloat(amount))
-      : -Math.abs(parseFloat(amount));
-
-    // Create a hidden input to submit the signed amount
-    const formData = new FormData(e.currentTarget);
-    formData.set("amount", formattedAmount.toString());
-
-    // Submit the form with the updated FormData
-    const submitEvent = new SubmitEvent("submit", { bubbles: true, cancelable: true });
-    Object.defineProperty(e.currentTarget, "formData", {
-      value: formData,
-      writable: false
-    });
-    e.currentTarget.dispatchEvent(submitEvent);
-  };
-
   return (
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
       <DialogTrigger asChild>
@@ -145,13 +123,13 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
           Add Transaction
         </Button>
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Add Transaction</DialogTitle>
         </DialogHeader>
 
-        <Form method="post" className="space-y-6" onSubmit={handleSubmit}>
+        <Form method="post" className="space-y-6">
           <input type="hidden" name="_action" value="createTransaction" />
 
           <div className="space-y-4">
@@ -160,8 +138,7 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
               <Label htmlFor="amount">Amount</Label>
               <div className="space-y-2">
                 <Input
-                  id="amount"
-                  name="amount"
+                  id="amount-display"
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
@@ -171,6 +148,11 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
                   onFocus={handleAmountFocus}
                   required
                   className="text-base text-center"
+                />
+                <input 
+                  type="hidden" 
+                  name="amount" 
+                  value={isIncome ? Math.abs(parseFloat(amount || "0")) : -Math.abs(parseFloat(amount || "0"))}
                 />
                 <div className="flex space-x-2">
                   <Button
@@ -249,8 +231,7 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
                     <Command>
                       <CommandInput placeholder="Search category..." />
                       <CommandEmpty>No category found.</CommandEmpty>
-                      <div className="max-h-[200px] overflow-y-auto">
-                        <CommandGroup>
+                      <CommandGroup className="max-h-[200px] overflow-y-auto">
                           {categories.map((c) => (
                             <CommandItem
                               key={c.value}
@@ -270,7 +251,6 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
                             </CommandItem>
                           ))}
                         </CommandGroup>
-                      </div>
                     </Command>
                   </PopoverContent>
                 </Popover>
