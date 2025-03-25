@@ -118,7 +118,7 @@ app/routes/api/sync-transactions.ts: Create an API route to trigger the transact
 Step Dependencies: Step 5
 User Instructions: Set up a cron job to call GET /api/sync-transactions daily (e.g., using a service like Vercel Cron Jobs or a server-side scheduler).
 Transaction Management
-[ ] Step 7: Implement manual transaction entry
+[x] Step 7: Implement manual transaction entry
 Task: Create a form for manually entering transactions (income/spending) and display them in a list with categorization.
 Files:
 app/components/forms/transaction-form.tsx: Create a form component for entering transaction details (date, amount, category, description).

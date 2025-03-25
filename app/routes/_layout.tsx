@@ -37,7 +37,7 @@ export const loader: LoaderFunction = async ({ request }) => {
 
 export default function LayoutRoute() {
   const { user } = useLoaderData<{ user: User | null }>();
-  
+
   if (user) {
     return <DashboardLayout user={user} />;
   } else {

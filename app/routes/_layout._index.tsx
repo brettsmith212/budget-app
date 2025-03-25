@@ -41,21 +41,21 @@ export default function Index() {
             with our simple and powerful budgeting tools.
           </p>
           <div className="flex justify-center space-x-4">
-            <a 
-              href="/auth/login" 
+            <a
+              href="/auth/login"
               className="px-6 py-3 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90"
             >
               Get Started
             </a>
-            <a 
-              href="#features" 
+            <a
+              href="#features"
               className="px-6 py-3 bg-secondary text-secondary-foreground rounded-md font-medium hover:bg-secondary/90"
             >
               Learn More
             </a>
           </div>
         </div>
-        
+
         <div id="features" className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="bg-card rounded-lg p-6 shadow-sm">
             <h3 className="text-xl font-semibold mb-3">Track Expenses</h3>

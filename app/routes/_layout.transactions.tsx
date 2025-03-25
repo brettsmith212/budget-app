@@ -8,7 +8,7 @@
  */
 
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useRevalidator } from "@remix-run/react";
 import { format, parseISO } from "date-fns";
 import { useState } from "react";
 import { requireUser } from "~/lib/supabase.server";
@@ -82,7 +82,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   } catch (error) {
     console.error("Error fetching transactions:", error);
     return json({
-      transactions: [], 
+      transactions: [],
       stats: {
         totalIncome: 0,
         totalExpenses: 0,
@@ -168,6 +168,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function TransactionsPage() {
   const { transactions, stats, error } = useLoaderData<typeof loader>();
+  const revalidator = useRevalidator();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortField, setSortField] = useState<keyof Transaction>("date");
@@ -231,7 +232,7 @@ export default function TransactionsPage() {
       <h1 className="text-3xl font-bold mb-8">Transactions</h1>
 
       {/* Transaction Form */}
-      <TransactionForm />
+      <TransactionForm onSuccess={revalidator.revalidate} />
 
       {/* Summary Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

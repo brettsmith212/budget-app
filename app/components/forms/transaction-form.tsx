@@ -15,6 +15,13 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -49,28 +56,64 @@ const categories = [
   { value: "other", label: "Other" },
 ];
 
-export default function TransactionForm() {
+interface TransactionFormProps {
+  onSuccess?: () => void;
+}
+
+export default function TransactionForm({ onSuccess }: TransactionFormProps) {
   const actionData = useActionData<ActionState<TransactionFormData>>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [amount, setAmount] = useState("");
+  const [displayAmount, setDisplayAmount] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [open, setOpen] = useState(false);
   const [isIncome, setIsIncome] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Format number with commas and decimals
+  const formatAmount = (value: string) => {
+    const number = parseFloat(value);
+    if (isNaN(number)) return "";
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(number);
+  };
+
+  // Handle amount change and blur
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9.]/g, '');
+    setAmount(value);
+    setDisplayAmount(value);
+  };
+
+  const handleAmountBlur = () => {
+    if (amount) {
+      setDisplayAmount(formatAmount(amount));
+    }
+  };
+
+  const handleAmountFocus = () => {
+    setDisplayAmount(amount);
+  };
 
   // Reset form after successful submission
   useEffect(() => {
     if (actionData?.isSuccess) {
       setDate(new Date());
       setAmount("");
+      setDisplayAmount("");
       setCategory("");
       setDescription("");
       setIsIncome(false);
+      setIsModalOpen(false);
+      onSuccess?.();
     }
-  }, [actionData]);
+  }, [actionData, onSuccess]);
 
   // Handle amount sign based on income/expense selection
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -95,164 +138,175 @@ export default function TransactionForm() {
   };
 
   return (
-    <div className="bg-background shadow-md rounded-lg p-6 mb-8">
-      <h2 className="text-2xl font-bold mb-6">Add Transaction</h2>
-
-      <Form method="post" className="space-y-6" onSubmit={handleSubmit}>
-        <input type="hidden" name="_action" value="createTransaction" />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : "Select date"}
-                </Button>
-              </PopoverTrigger>
-
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-
-            <input
-              type="hidden"
-              name="date"
-              value={date ? format(date, "yyyy-MM-dd") : ""}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
-
-            <div className="flex space-x-2">
-              <Input
-                id="amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAmount(e.target.value)}
-                required
-                className="flex-1"
-              />
-
-              <Button
-                type="button"
-                variant={isIncome ? "default" : "outline"}
-                onClick={() => setIsIncome(true)}
-                className={`w-24 ${isIncome ? 'bg-green-600 hover:bg-green-700' : ''}`}
-              >
-                Income
-              </Button>
-
-              <Button
-                type="button"
-                variant={!isIncome ? "default" : "outline"}
-                onClick={() => setIsIncome(false)}
-                className={`w-24 ${!isIncome ? 'bg-red-600 hover:bg-red-700' : ''}`}
-              >
-                Expense
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="category">Category</Label>
-
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                className="w-full justify-between"
-              >
-                {category
-                  ? categories.find((c) => c.value === category)?.label
-                  : "Select category..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-
-            <PopoverContent className="w-full p-0">
-              <Command>
-                <CommandInput placeholder="Search category..." />
-                <CommandEmpty>No category found.</CommandEmpty>
-
-                <CommandGroup>
-                  {categories.map((c) => (
-                    <CommandItem
-                      key={c.value}
-                      value={c.value}
-                      onSelect={(value: string) => {
-                        setCategory(value);
-                        setOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          category === c.value ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      {c.label}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
-
-          <input type="hidden" name="category" value={category} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-
-          <Textarea
-            id="description"
-            name="description"
-            placeholder="Enter transaction description"
-            value={description}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
-            rows={3}
-          />
-        </div>
-
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : "Add Transaction"}
-          {!isSubmitting && <Plus className="ml-2 h-4 w-4" />}
+    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <DialogTrigger asChild>
+        <Button className="mb-6">
+          <Plus className="mr-2 h-4 w-4" />
+          Add Transaction
         </Button>
+      </DialogTrigger>
+      
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Add Transaction</DialogTitle>
+        </DialogHeader>
 
-        {actionData && (
-          <div
-            className={`p-4 mt-4 rounded-md ${
-              actionData.isSuccess
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
-            }`}
-          >
-            {actionData.message}
+        <Form method="post" className="space-y-6" onSubmit={handleSubmit}>
+          <input type="hidden" name="_action" value="createTransaction" />
+
+          <div className="space-y-4">
+            {/* Amount Section */}
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount</Label>
+              <div className="space-y-2">
+                <Input
+                  id="amount"
+                  name="amount"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={displayAmount}
+                  onChange={handleAmountChange}
+                  onBlur={handleAmountBlur}
+                  onFocus={handleAmountFocus}
+                  required
+                  className="text-base text-center"
+                />
+                <div className="flex space-x-2">
+                  <Button
+                    type="button"
+                    variant={isIncome ? "default" : "outline"}
+                    onClick={() => setIsIncome(true)}
+                    className={`flex-1 ${isIncome ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                  >
+                    Income
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!isIncome ? "default" : "outline"}
+                    onClick={() => setIsIncome(false)}
+                    className={`flex-1 ${!isIncome ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                  >
+                    Expense
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Date and Category Section */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date">Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {date ? format(date, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={setDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <input
+                  type="hidden"
+                  name="date"
+                  value={date ? format(date, "yyyy-MM-dd") : ""}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between"
+                    >
+                      {category
+                        ? categories.find((c) => c.value === category)?.label
+                        : "Select category..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-full p-0" align="start" side="bottom" sideOffset={4}>
+                    <Command>
+                      <CommandInput placeholder="Search category..." />
+                      <CommandEmpty>No category found.</CommandEmpty>
+                      <div className="max-h-[200px] overflow-y-auto">
+                        <CommandGroup>
+                          {categories.map((c) => (
+                            <CommandItem
+                              key={c.value}
+                              value={c.value}
+                              onSelect={(value) => {
+                                setCategory(value);
+                                setOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  category === c.value ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {c.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </div>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <input type="hidden" name="category" value={category} />
+              </div>
+            </div>
+
+            {/* Description Section */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                name="description"
+                placeholder="Add a note about this transaction..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Adding..." : "Add Transaction"}
+            </Button>
+
+            {actionData && (
+              <p
+                className={cn(
+                  "text-sm mt-2 text-center",
+                  actionData.isSuccess ? "text-green-600" : "text-red-600"
+                )}
+              >
+                {actionData.message}
+              </p>
+            )}
           </div>
-        )}
-      </Form>
-    </div>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }
