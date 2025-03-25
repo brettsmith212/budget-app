@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "~/components/ui/dialog";
 import {
@@ -127,6 +128,9 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Add Transaction</DialogTitle>
+          <DialogDescription>
+            Enter the details of your transaction below.
+          </DialogDescription>
         </DialogHeader>
 
         <Form method="post" className="space-y-6">
