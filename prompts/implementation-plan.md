@@ -110,7 +110,7 @@ app/routes/accounts/connect.tsx: Create a route with a Plaid Link component for 
 app/components/plaid-link.tsx: Create a reusable Plaid Link component for initiating the connection flow.
 Step Dependencies: Step 3, Step 4
 User Instructions: None
-[ ] Step 6: Implement transaction sync server action
+[x] Step 6: Implement transaction sync server action
 Task: Create a server action to sync transactions from Plaid accounts and save them to the transactions table, with a manual trigger option.
 Files:
 app/lib/plaid.server.ts: Add a function to sync transactions using Plaid’s /transactions/sync endpoint.
