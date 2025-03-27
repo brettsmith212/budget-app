@@ -33,8 +33,33 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables: SUPABASE_URL and SUPABASE_ANON_KEY must be set');
 }
 
+// Default client options with increased timeouts and retry logic
+const defaultClientOptions = {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false
+  },
+  global: {
+    fetch: (url: RequestInfo | URL, options?: RequestInit) => {
+      return fetch(url, {
+        ...options,
+        // Set longer timeouts to handle network latency (30 seconds)
+        signal: AbortSignal.timeout(30000),
+      });
+    },
+  },
+  // Set reasonable timeouts for different operations
+  db: {
+    schema: 'public',
+  },
+  realtime: {
+    timeout: 20000, // 20 seconds for realtime connections
+  },
+};
+
 // Create the default Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, defaultClientOptions);
 
 /**
  * Get a Supabase client instance authenticated with the user's session token
@@ -52,20 +77,31 @@ export async function getSupabase(request: Request) {
 
   // Create a new client instance with the user's access token
   const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    ...defaultClientOptions,
     global: {
+      ...defaultClientOptions.global,
       headers: {
         Authorization: `Bearer ${token}`,
       },
     },
   });
 
-  // Verify the token by fetching the user; if invalid, return null
-  const { data: { user }, error } = await supabaseClient.auth.getUser();
-  if (error || !user) {
+  try {
+    // Verify the token by fetching the user; if invalid, return null
+    const { data: { user }, error } = await supabaseClient.auth.getUser();
+    if (error) {
+      console.error("Error getting user:", error.message);
+      return { supabase: null, user: null };
+    }
+    if (!user) {
+      return { supabase: null, user: null };
+    }
+    return { supabase: supabaseClient, user };
+  } catch (error) {
+    // Handle network errors or timeouts gracefully
+    console.error("Authentication error:", error instanceof Error ? error.message : "Unknown error");
     return { supabase: null, user: null };
   }
-
-  return { supabase: supabaseClient, user };
 }
 
 /**
@@ -75,9 +111,18 @@ export async function getSupabase(request: Request) {
  * @throws Redirect to /auth/login if the user is not authenticated
  */
 export async function requireUser(request: Request) {
-  const { supabase, user } = await getSupabase(request);
-  if (!supabase || !user) {
+  try {
+    const { supabase, user } = await getSupabase(request);
+    if (!supabase || !user) {
+      throw redirect('/auth/login');
+    }
+    return { supabase, user };
+  } catch (error) {
+    // If there's an error during authentication (like network issues),
+    // log it and redirect to login
+    if (!(error instanceof Response)) {
+      console.error("Authentication error in requireUser:", error instanceof Error ? error.message : "Unknown error");
+    }
     throw redirect('/auth/login');
   }
-  return { supabase, user };
 }
