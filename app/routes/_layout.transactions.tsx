@@ -10,10 +10,10 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import type { Transaction, TransactionFormData, ActionState } from "@/types";
 
-import { json } from "@remix-run/node";
-import { useLoaderData, useRevalidator, Form } from "@remix-run/react";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData, useRevalidator, Form, useFetcher } from "@remix-run/react";
 import { format, parseISO } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowUpDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { requireUser } from "@/lib/supabase.server";
@@ -164,17 +164,8 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    // Return success response with form data
-    return json<ActionState<TransactionFormData>>({
-      isSuccess: true,
-      message: "Transaction added successfully!",
-      data: {
-        date,
-        amount: amountStr,
-        category,
-        description,
-      },
-    });
+    // Redirect back to the page to force a fresh load of data
+    return redirect("/transactions");
   }
 
   // Handle transaction update
@@ -222,16 +213,8 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    return json<ActionState<TransactionFormData>>({
-      isSuccess: true,
-      message: "Transaction updated successfully!",
-      data: {
-        date,
-        amount: amountStr,
-        category,
-        description,
-      },
-    });
+    // Redirect back to the page to force a fresh load of data
+    return redirect("/transactions");
   }
 
   // Handle transaction deletion
@@ -259,17 +242,15 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    return json<ActionState<null>>({
-      isSuccess: true,
-      message: "Transaction deleted successfully!",
-      data: null
-    });
+    // Redirect back to the page to force a fresh load of data
+    return redirect("/transactions");
   }
 }
 
 export default function TransactionsPage() {
   const { transactions, stats, error } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
+  const transactionFetcher = useFetcher();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortConfig, setSortConfig] = useState<{
@@ -278,6 +259,21 @@ export default function TransactionsPage() {
   }>({ key: "date", direction: "desc" });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(0);
+
+  // This effect ensures we revalidate data after fetcher submissions complete
+  useEffect(() => {
+    if (transactionFetcher.state === "idle" && transactionFetcher.data) {
+      console.log("Fetcher completed, revalidating...");
+      revalidator.revalidate();
+    }
+  }, [transactionFetcher.state, transactionFetcher.data, revalidator]);
+
+  // This effect ensures we revalidate data when component mounts or forceUpdate changes
+  useEffect(() => {
+    console.log("Force update triggered, revalidating...");
+    revalidator.revalidate();
+  }, [forceUpdate, revalidator]);
 
   // Filter transactions based on search term and category
   const filteredTransactions = (transactions || []).filter((transaction: Transaction) => {
@@ -347,7 +343,17 @@ export default function TransactionsPage() {
 
   // Handle successful transaction operations
   const handleTransactionSuccess = () => {
+    console.log("Transaction success handler called");
+    
+    // Trigger both a direct revalidation and a component update
     revalidator.revalidate();
+    setForceUpdate(prev => prev + 1);
+    
+    // Wait a short moment and revalidate again to ensure data is fresh
+    setTimeout(() => {
+      console.log("Delayed revalidation triggered");
+      revalidator.revalidate();
+    }, 500);
   };
 
   return (
@@ -523,20 +529,22 @@ export default function TransactionsPage() {
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <Form method="post">
+                        <transactionFetcher.Form method="post">
                           <input type="hidden" name="_action" value="deleteTransaction" />
                           <input type="hidden" name="transactionId" value={transaction.id} />
                           <AlertDialogAction
                             type="submit"
                             onClick={() => {
+                              // We'll let the fetcher handle the submission
+                              // The useEffect above will trigger revalidation when complete
                               setTimeout(() => {
                                 handleTransactionSuccess();
-                              }, 100);
+                              }, 200);
                             }}
                           >
                             Delete
                           </AlertDialogAction>
-                        </Form>
+                        </transactionFetcher.Form>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
@@ -567,7 +575,7 @@ export default function TransactionsPage() {
             <AlertDialogCancel onClick={() => setSelectedTransaction(null)}>
               Cancel
             </AlertDialogCancel>
-            <Form method="post">
+            <transactionFetcher.Form method="post">
               <input type="hidden" name="_action" value="deleteTransaction" />
               <input
                 type="hidden"
@@ -581,7 +589,7 @@ export default function TransactionsPage() {
               >
                 Delete
               </AlertDialogAction>
-            </Form>
+            </transactionFetcher.Form>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

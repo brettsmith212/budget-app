@@ -6,8 +6,8 @@
  * (positive amounts) and expenses (negative amounts).
  */
 
-import { useEffect, useState } from "react";
-import { Form, useActionData, useNavigation } from "@remix-run/react";
+import { useState, useEffect } from "react";
+import { Form, useActionData, useNavigation, useFetcher } from "@remix-run/react";
 import { CalendarIcon, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -88,8 +88,10 @@ export default function TransactionForm({
 }: TransactionFormProps) {
   const actionData = useActionData<ActionState<TransactionFormData>>();
   const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
+  const fetcher = useFetcher();
+  const isSubmitting = navigation.state === "submitting" || fetcher.state === "submitting";
   const [open, setOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
 
   const [date, setDate] = useState<Date | undefined>(
     transaction?.date ? parseISO(transaction.date) : new Date()
@@ -121,21 +123,19 @@ export default function TransactionForm({
 
   // Reset form and close dialog on successful submission
   useEffect(() => {
-    if (actionData?.isSuccess) {
-      setOpen(false);
-      if (mode === "create") {
-        setDate(new Date());
-        setAmount("");
-        setDisplayAmount("");
-        setCategory("");
-        setDescription("");
-        setIsIncome(false);
-      }
+    // Check for success from either the fetcher or actionData
+    const isSuccess = (fetcher.data as ActionState<TransactionFormData>)?.isSuccess || actionData?.isSuccess;
+    
+    if (isSuccess) {
+      // Call onSuccess callback after a short timeout to ensure dialog is closed first
       if (onSuccess) {
-        onSuccess();
+        // Use a slight delay to ensure the dialog closes first and state updates
+        setTimeout(() => {
+          onSuccess();
+        }, 100);
       }
     }
-  }, [actionData?.isSuccess, onSuccess, mode]);
+  }, [fetcher.data, actionData?.isSuccess, onSuccess]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -153,7 +153,25 @@ export default function TransactionForm({
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        <Form method="post" className="space-y-6">
+        <fetcher.Form 
+          method="post" 
+          className="space-y-6"
+          onSubmit={() => {
+            // Close the dialog as soon as form is submitted
+            // Since we're using redirect in the action, we need to close the modal right away
+            setOpen(false);
+            
+            // Reset form fields for create mode to ensure fresh form on next open
+            if (mode === "create") {
+              setDate(new Date());
+              setAmount("");
+              setDisplayAmount("");
+              setCategory("");
+              setDescription("");
+              setIsIncome(false);
+            }
+          }}
+        >
           <input type="hidden" name="_action" value={mode === "create" ? "createTransaction" : "updateTransaction"} />
           {transaction?.id && <input type="hidden" name="transactionId" value={transaction.id} />}
 
@@ -232,12 +250,12 @@ export default function TransactionForm({
 
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Popover open={open} onOpenChange={setOpen}>
+                <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      aria-expanded={open}
+                      aria-expanded={categoryOpen}
                       className="w-full justify-between"
                     >
                       {category
@@ -256,7 +274,7 @@ export default function TransactionForm({
                             key={cat.value}
                             onSelect={() => {
                               setCategory(cat.value);
-                              setOpen(false);
+                              setCategoryOpen(false);
                             }}
                           >
                             <Check
@@ -297,12 +315,22 @@ export default function TransactionForm({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                onClick={() => {
+                  // Close the modal when clicking submit
+                  // This handles the case where form validation might fail
+                  if (!isSubmitting) {
+                    setOpen(false);
+                  }
+                }}
+              >
                 {isSubmitting ? "Saving..." : mode === "create" ? "Add Transaction" : "Save Changes"}
               </Button>
             </div>
           </div>
-        </Form>
+        </fetcher.Form>
       </DialogContent>
     </Dialog>
   );
