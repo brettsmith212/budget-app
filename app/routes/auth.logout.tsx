@@ -10,7 +10,7 @@
  *
  * @dependencies
  * - @remix-run/node: Remix server utilities for actions and redirects
- * - ~/lib/session.server: Session management utilities
+ * - @/lib/session.server: Session management utilities
  *
  * @notes
  * - This is an action-only route, typically triggered by a POST request from a form
@@ -19,7 +19,7 @@
 
 import type { ActionFunction } from '@remix-run/node';
 import { redirect } from '@remix-run/node';
-import { destroySession, getSession } from '~/lib/session.server';
+import { destroySession, getSession } from '@/lib/session.server';
 
 export const action: ActionFunction = async ({ request }) => {
   const session = await getSession(request.headers.get('Cookie'));

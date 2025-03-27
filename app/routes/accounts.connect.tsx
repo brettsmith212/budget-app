@@ -15,9 +15,9 @@
  * @dependencies
  * - @remix-run/node: For LoaderFunction, ActionFunction, json, and redirect
  * - @remix-run/react: For useLoaderData and useFetcher hooks
- * - ~/lib/supabase.server: For requireUser utility to enforce authentication
- * - ~/lib/plaid.server: For createLinkToken and exchangePublicToken functions
- * - ~/components/plaid-link: For PlaidLinkComponent
+ * - @/lib/supabase.server: For requireUser utility to enforce authentication
+ * - @/lib/plaid.server: For createLinkToken and exchangePublicToken functions
+ * - @/components/plaid-link: For PlaidLinkComponent
  *
  * @notes
  * - Requires authentication; redirects to /auth/login if user is not authenticated
@@ -30,13 +30,19 @@
 import type { ActionFunction, LoaderFunction } from '@remix-run/node';
 import { json, redirect } from '@remix-run/node';
 import { useLoaderData, useFetcher } from '@remix-run/react';
-import { requireUser } from '~/lib/supabase.server';
-import { createLinkToken, exchangePublicToken } from '~/lib/plaid.server';
-import PlaidLinkComponent from '~/components/plaid-link';
+import { requireUser } from '@/lib/supabase.server';
+import { createLinkToken, exchangePublicToken } from '@/lib/plaid.server';
+import PlaidLinkComponent from '@/components/plaid-link';
 
 // Define loader return type
 interface LoaderData {
   linkToken: string;
+}
+
+// Define action return type
+interface ActionData {
+  error?: string;
+  success?: boolean;
 }
 
 /**
@@ -63,24 +69,21 @@ export const action: ActionFunction = async ({ request }) => {
     throw new Error('Supabase client not initialized for authenticated user');
   }
 
-  const formData = await request.formData();
-  const publicToken = formData.get('publicToken');
-  const institutionName = formData.get('institutionName');
-
-  // Validate form data
-  if (typeof publicToken !== 'string' || typeof institutionName !== 'string') {
-    return json({ error: 'Invalid form data' }, { status: 400 });
-  }
-
   try {
+    const formData = await request.formData();
+    const publicToken = formData.get('publicToken') as string;
+    const institutionName = formData.get('institutionName') as string;
+
+    if (!publicToken || !institutionName) {
+      return json<ActionData>({ error: 'Missing required fields' });
+    }
+
+    // Exchange public token and save account info
     await exchangePublicToken(publicToken, institutionName, user.id, supabase);
-    return redirect('/'); // Redirect to dashboard on success
+    return json<ActionData>({ success: true });
   } catch (error) {
-    // Handle Plaid or Supabase errors
-    return json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    console.error('Error connecting account:', error);
+    return json<ActionData>({ error: 'Failed to connect account' });
   }
 };
 
@@ -90,7 +93,7 @@ export const action: ActionFunction = async ({ request }) => {
  */
 export default function Connect() {
   const { linkToken } = useLoaderData<LoaderData>(); // Get link token from loader
-  const fetcher = useFetcher(); // For programmatic form submission
+  const fetcher = useFetcher<ActionData>(); // For programmatic form submission
 
   // Handle successful Plaid Link connection
   const handleOnSuccess = (publicToken: string, metadata: any) => {

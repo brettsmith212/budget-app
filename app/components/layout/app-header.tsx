@@ -8,7 +8,7 @@
  */
 
 import { NavLink, Link } from '@remix-run/react';
-import { cn } from '~/lib/utils';
+import { cn } from '@/lib/utils';
 import type { User } from '@supabase/supabase-js';
 
 interface AppHeaderProps {
@@ -28,7 +28,7 @@ export default function AppHeader({ user, onLogout }: AppHeaderProps) {
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center">
           <Link to="/" className="text-xl font-bold mr-8">Budget App</Link>
-          
+
           {user && (
             <nav>
               <ul className="flex space-x-4">
@@ -53,7 +53,7 @@ export default function AppHeader({ user, onLogout }: AppHeaderProps) {
             </nav>
           )}
         </div>
-        
+
         <div className="flex items-center space-x-4">
           {user ? (
             <>

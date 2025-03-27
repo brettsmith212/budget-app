@@ -1,10 +1,10 @@
 import type { ActionFunction, LoaderFunction } from '@remix-run/node';
 import { Form, useActionData } from '@remix-run/react';
 import { json, redirect } from '@remix-run/node';
-import { commitSession, getSession } from '~/lib/session.server';
-import { supabase } from '~/lib/supabase.server';
-import { getSupabase } from '~/lib/supabase.server';
-import AppHeader from '~/components/layout/app-header';
+import { commitSession, getSession } from '@/lib/session.server';
+import { supabase } from '@/lib/supabase.server';
+import { getSupabase } from '@/lib/supabase.server';
+import AppHeader from '@/components/layout/app-header';
 
 /**
  * Loader to check if the user is already authenticated
@@ -66,7 +66,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-background">
       <AppHeader user={null} />
-      
+
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-md mx-auto p-8 rounded-lg border border-border">
           <h1 className="text-2xl font-bold text-foreground mb-6">Login</h1>

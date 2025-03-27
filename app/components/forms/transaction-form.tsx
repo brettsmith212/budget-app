@@ -1,7 +1,7 @@
 /**
- * Transaction form component for manual entry of income/expense transactions
+ * Transaction form component for manual entry and editing of income/expense transactions
  *
- * This component provides a form for users to manually enter transaction details
+ * This component provides a form for users to manually enter or edit transaction details
  * including date, amount, category, and description. The form handles both income
  * (positive amounts) and expenses (negative amounts).
  */
@@ -9,11 +9,11 @@
 import { useEffect, useState } from "react";
 import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { CalendarIcon, Check, ChevronsUpDown, Plus } from "lucide-react";
-import { cn } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Textarea } from "~/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -21,22 +21,22 @@ import {
   DialogTitle,
   DialogDescription,
   DialogTrigger,
-} from "~/components/ui/dialog";
+} from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "~/components/ui/popover";
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
-} from "~/components/ui/command";
-import { Calendar } from "~/components/ui/calendar";
-import { format } from "date-fns";
-import type { ActionState, TransactionFormData } from "@/types";
+} from "@/components/ui/command";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parseISO } from "date-fns";
+import type { ActionState, Transaction, TransactionFormData } from "@/types";
 
 // Transaction categories
 const categories = [
@@ -57,33 +57,50 @@ const categories = [
   { value: "other", label: "Other" },
 ];
 
+// Format number with commas and decimals
+const formatAmount = (value: string) => {
+  const number = parseFloat(value);
+  if (isNaN(number)) return "";
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(number);
+};
+
 interface TransactionFormProps {
   onSuccess?: () => void;
+  transaction?: Transaction;
+  mode?: "create" | "edit";
+  trigger?: React.ReactNode;
+  dialogTitle?: string;
+  dialogDescription?: string;
 }
 
-export default function TransactionForm({ onSuccess }: TransactionFormProps) {
+export default function TransactionForm({
+  onSuccess,
+  transaction,
+  mode = "create",
+  trigger,
+  dialogTitle = mode === "create" ? "Add Transaction" : "Edit Transaction",
+  dialogDescription = mode === "create"
+    ? "Enter the details of your transaction below."
+    : "Update the details of your transaction below."
+}: TransactionFormProps) {
   const actionData = useActionData<ActionState<TransactionFormData>>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
-
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [amount, setAmount] = useState("");
-  const [displayAmount, setDisplayAmount] = useState("");
-  const [category, setCategory] = useState("");
-  const [description, setDescription] = useState("");
   const [open, setOpen] = useState(false);
-  const [isIncome, setIsIncome] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Format number with commas and decimals
-  const formatAmount = (value: string) => {
-    const number = parseFloat(value);
-    if (isNaN(number)) return "";
-    return new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(number);
-  };
+  const [date, setDate] = useState<Date | undefined>(
+    transaction?.date ? parseISO(transaction.date) : new Date()
+  );
+  const [amount, setAmount] = useState(transaction?.amount?.toString() || "");
+  const [displayAmount, setDisplayAmount] = useState(
+    transaction ? formatAmount(Math.abs(transaction.amount).toString()) : ""
+  );
+  const [category, setCategory] = useState(transaction?.category || "");
+  const [description, setDescription] = useState(transaction?.description || "");
+  const [isIncome, setIsIncome] = useState(transaction ? transaction.amount > 0 : false);
 
   // Handle amount change and blur
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,39 +119,43 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
     setDisplayAmount(amount);
   };
 
-  // Reset form after successful submission
+  // Reset form and close dialog on successful submission
   useEffect(() => {
     if (actionData?.isSuccess) {
-      setDate(new Date());
-      setAmount("");
-      setDisplayAmount("");
-      setCategory("");
-      setDescription("");
-      setIsIncome(false);
-      setIsModalOpen(false);
-      onSuccess?.();
+      setOpen(false);
+      if (mode === "create") {
+        setDate(new Date());
+        setAmount("");
+        setDisplayAmount("");
+        setCategory("");
+        setDescription("");
+        setIsIncome(false);
+      }
+      if (onSuccess) {
+        onSuccess();
+      }
     }
-  }, [actionData, onSuccess]);
+  }, [actionData?.isSuccess, onSuccess, mode]);
 
   return (
-    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-      <DialogTrigger asChild>
-        <Button className="mb-6">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Transaction
-        </Button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild onClick={() => setOpen(true)}>
+        {trigger || (
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Transaction
+          </Button>
+        )}
       </DialogTrigger>
-
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
-          <DialogDescription>
-            Enter the details of your transaction below.
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
         <Form method="post" className="space-y-6">
-          <input type="hidden" name="_action" value="createTransaction" />
+          <input type="hidden" name="_action" value={mode === "create" ? "createTransaction" : "updateTransaction"} />
+          {transaction?.id && <input type="hidden" name="transactionId" value={transaction.id} />}
 
           <div className="space-y-4">
             {/* Amount Section */}
@@ -206,12 +227,7 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
                     />
                   </PopoverContent>
                 </Popover>
-
-                <input
-                  type="hidden"
-                  name="date"
-                  value={date ? format(date, "yyyy-MM-dd") : ""}
-                />
+                <input type="hidden" name="date" value={date ? format(date, "yyyy-MM-dd") : ""} />
               </div>
 
               <div className="space-y-2">
@@ -225,36 +241,34 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
                       className="w-full justify-between"
                     >
                       {category
-                        ? categories.find((c) => c.value === category)?.label
+                        ? categories.find((cat) => cat.value === category)?.label
                         : "Select category..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-
-                  <PopoverContent className="w-full p-0" align="start" side="bottom" sideOffset={4}>
+                  <PopoverContent className="w-full p-0">
                     <Command>
                       <CommandInput placeholder="Search category..." />
                       <CommandEmpty>No category found.</CommandEmpty>
-                      <CommandGroup className="max-h-[200px] overflow-y-auto">
-                          {categories.map((c) => (
-                            <CommandItem
-                              key={c.value}
-                              value={c.value}
-                              onSelect={(value) => {
-                                setCategory(value);
-                                setOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  category === c.value ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {c.label}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
+                      <CommandGroup>
+                        {categories.map((cat) => (
+                          <CommandItem
+                            key={cat.value}
+                            onSelect={() => {
+                              setCategory(cat.value);
+                              setOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                category === cat.value ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {cat.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
                     </Command>
                   </PopoverContent>
                 </Popover>
@@ -268,26 +282,25 @@ export default function TransactionForm({ onSuccess }: TransactionFormProps) {
               <Textarea
                 id="description"
                 name="description"
-                placeholder="Add a note about this transaction..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                className="min-h-[100px]"
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Adding..." : "Add Transaction"}
-            </Button>
-
-            {actionData && (
-              <p
-                className={cn(
-                  "text-sm mt-2 text-center",
-                  actionData.isSuccess ? "text-green-600" : "text-red-600"
-                )}
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
               >
-                {actionData.message}
-              </p>
-            )}
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : mode === "create" ? "Add Transaction" : "Save Changes"}
+              </Button>
+            </div>
           </div>
         </Form>
       </DialogContent>

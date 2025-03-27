@@ -13,9 +13,9 @@
  * @dependencies
  * - @remix-run/node: For LoaderFunction and json
  * - @remix-run/react: For useLoaderData
- * - ~/lib/supabase.server: For getSupabase utility to retrieve user
- * - ~/components/layout/dashboard-layout: For DashboardLayout component
- * - ~/components/layout/landing-layout: For LandingLayout component
+ * - @/lib/supabase.server: For getSupabase utility to retrieve user
+ * - @/components/layout/dashboard-layout: For DashboardLayout component
+ * - @/components/layout/landing-layout: For LandingLayout component
  *
  * @notes
  * - Child routes (e.g., _layout._index, _layout.transactions) are rendered within this layout
@@ -25,9 +25,9 @@
 import type { LoaderFunction } from '@remix-run/node';
 import { json } from '@remix-run/node';
 import { useLoaderData } from '@remix-run/react';
-import DashboardLayout from '~/components/layout/dashboard-layout';
-import LandingLayout from '~/components/layout/landing-layout';
-import { getSupabase } from '~/lib/supabase.server';
+import DashboardLayout from '@/components/layout/dashboard-layout';
+import LandingLayout from '@/components/layout/landing-layout';
+import { getSupabase } from '@/lib/supabase.server';
 import type { User } from '@supabase/supabase-js';
 
 export const loader: LoaderFunction = async ({ request }) => {

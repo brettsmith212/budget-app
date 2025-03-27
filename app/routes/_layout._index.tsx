@@ -9,7 +9,7 @@ import { useLoaderData } from '@remix-run/react';
 import { json } from '@remix-run/node';
 import type { LoaderFunction } from '@remix-run/node';
 import type { User } from '@supabase/supabase-js';
-import { getSupabase } from '~/lib/supabase.server';
+import { getSupabase } from '@/lib/supabase.server';
 
 export const loader: LoaderFunction = async ({ request }) => {
   const { user } = await getSupabase(request);

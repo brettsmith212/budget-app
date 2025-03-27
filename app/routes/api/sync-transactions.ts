@@ -11,8 +11,8 @@
  *
  * @dependencies
  * - @remix-run/node: For ActionFunction and json utilities
- * - ~/lib/supabase.server: For requireUser utility and Supabase client creation
- * - ~/lib/plaid.server: For syncTransactions function
+ * - @/lib/supabase.server: For requireUser utility and Supabase client creation
+ * - @/lib/plaid.server: For syncTransactions function
  * - @supabase/supabase-js: For createClient function
  *
  * @notes
@@ -22,8 +22,8 @@
  */
 import type { ActionFunction } from '@remix-run/node';
 import { json } from '@remix-run/node';
-import { requireUser } from '~/lib/supabase.server';
-import { syncTransactions } from '~/lib/plaid.server';
+import { requireUser } from '@/lib/supabase.server';
+import { syncTransactions } from '@/lib/plaid.server';
 import { createClient } from '@supabase/supabase-js';
 
 /**

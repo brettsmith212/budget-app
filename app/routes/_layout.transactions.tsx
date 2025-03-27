@@ -7,13 +7,18 @@
  * 3. See transaction summary statistics
  */
 
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import type { Transaction, TransactionFormData, ActionState } from "@/types";
+
 import { json } from "@remix-run/node";
 import { useLoaderData, useRevalidator, Form } from "@remix-run/react";
 import { format, parseISO } from "date-fns";
 import { useState } from "react";
-import { requireUser } from "~/lib/supabase.server";
-import TransactionForm from "~/components/forms/transaction-form";
-import { Input } from "~/components/ui/input";
+import { ArrowUpDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
+
+import { requireUser } from "@/lib/supabase.server";
+import TransactionForm from "@/components/forms/transaction-form";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -21,16 +26,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "~/components/ui/table";
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { ArrowUpDown, Search, Trash2 } from "lucide-react";
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,10 +45,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import { Button } from "~/components/ui/button";
-import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
-import type { Transaction, TransactionFormData, ActionState } from "@/types";
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const meta: MetaFunction = () => {
   return [
@@ -174,10 +177,67 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
+  // Handle transaction update
+  if (_action === "updateTransaction") {
+    const transactionId = formData.get("transactionId") as string;
+    const date = formData.get("date") as string;
+    const amountStr = formData.get("amount") as string;
+    const category = formData.get("category") as string;
+    const description = formData.get("description") as string;
+
+    // Validate required fields
+    if (!transactionId || !date || !amountStr || !category) {
+      return json<ActionState<TransactionFormData>>({
+        isSuccess: false,
+        message: "Missing required fields for update.",
+      });
+    }
+
+    // Validate and parse amount
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount)) {
+      return json<ActionState<TransactionFormData>>({
+        isSuccess: false,
+        message: "Amount must be a valid number.",
+      });
+    }
+
+    // Update transaction in database
+    const { error } = await supabase
+      .from("transactions")
+      .update({
+        date,
+        amount,
+        category,
+        description: description || "",
+      })
+      .eq("id", transactionId)
+      .eq("user_id", user.id); // Ensure user can only update their own transactions
+
+    if (error) {
+      console.error("Error updating transaction:", error);
+      return json<ActionState<TransactionFormData>>({
+        isSuccess: false,
+        message: "Failed to update transaction. Please try again.",
+      });
+    }
+
+    return json<ActionState<TransactionFormData>>({
+      isSuccess: true,
+      message: "Transaction updated successfully!",
+      data: {
+        date,
+        amount: amountStr,
+        category,
+        description,
+      },
+    });
+  }
+
   // Handle transaction deletion
   if (_action === "deleteTransaction") {
     const transactionId = formData.get("transactionId") as string;
-    
+
     if (!transactionId) {
       return json<ActionState<null>>({
         isSuccess: false,
@@ -205,264 +265,290 @@ export async function action({ request }: ActionFunctionArgs) {
       data: null
     });
   }
-
-  return null;
 }
 
 export default function TransactionsPage() {
   const { transactions, stats, error } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [sortField, setSortField] = useState<keyof Transaction>("date");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof Transaction;
+    direction: "asc" | "desc";
+  }>({ key: "date", direction: "desc" });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
-  // Handle sorting
-  const handleSort = (field: keyof Transaction) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("desc");
+  // Filter transactions based on search term and category
+  const filteredTransactions = (transactions || []).filter((transaction: Transaction) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      transaction.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.category.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesCategory =
+      selectedCategory === "all" || transaction.category === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  // Sort transactions
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+    const aValue = a[sortConfig.key];
+    const bValue = b[sortConfig.key];
+
+    if (aValue === bValue) return 0;
+    if (aValue === null || aValue === undefined) return 1;
+    if (bValue === null || bValue === undefined) return -1;
+
+    // Special handling for dates
+    if (sortConfig.key === "date") {
+      return (new Date(aValue as string).getTime() - new Date(bValue as string).getTime()) *
+        (sortConfig.direction === "asc" ? 1 : -1);
     }
+
+    // Special handling for amounts
+    if (sortConfig.key === "amount") {
+      return ((aValue as number) - (bValue as number)) *
+        (sortConfig.direction === "asc" ? 1 : -1);
+    }
+
+    // Handle string comparisons (category, description)
+    return (String(aValue).localeCompare(String(bValue))) *
+      (sortConfig.direction === "asc" ? 1 : -1);
+  });
+
+  // Get unique categories for filter dropdown
+  const categories = Array.from(
+    new Set(transactions?.map(t => t.category) ?? [])
+  ).sort();
+
+  // Handle sort click
+  const handleSortClick = (key: keyof Transaction) => {
+    setSortConfig((current) => ({
+      key,
+      direction:
+        current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
   };
 
-  // Apply filters and sorting to transactions
-  const filteredAndSortedTransactions = transactions
-    .filter((transaction: Transaction) => {
-      // Apply category filter
-      if (categoryFilter !== "all" && transaction.category !== categoryFilter) {
-        return false;
-      }
+  // Format amount with currency symbol
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount);
+  };
 
-      // Apply search filter
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        return (
-          transaction.description?.toLowerCase().includes(searchLower) ||
-          transaction.category.toLowerCase().includes(searchLower) ||
-          transaction.amount.toString().includes(searchLower)
-        );
-      }
+  // Format date
+  const formatDate = (dateStr: string) => {
+    return format(parseISO(dateStr), "MMM d, yyyy");
+  };
 
-      return true;
-    })
-    .sort((a: Transaction, b: Transaction) => {
-      // Apply sorting
-      if (sortField === "date") {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
-      }
-
-      if (sortField === "amount") {
-        return sortDirection === "asc"
-          ? a.amount - b.amount
-          : b.amount - a.amount;
-      }
-
-      // Sort by string fields
-      const valueA = String(a[sortField]).toLowerCase();
-      const valueB = String(b[sortField]).toLowerCase();
-
-      return sortDirection === "asc"
-        ? valueA.localeCompare(valueB)
-        : valueB.localeCompare(valueA);
-    });
+  // Handle successful transaction operations
+  const handleTransactionSuccess = () => {
+    revalidator.revalidate();
+  };
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      <h1 className="text-3xl font-bold mb-8">Transactions</h1>
+    <div className="container py-8 space-y-8">
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
 
-      {/* Transaction Form */}
-      <TransactionForm onSuccess={revalidator.revalidate} />
-
-      {/* Summary Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader className="bg-green-50 dark:bg-green-900/20">
+          <CardHeader>
             <CardTitle>Income</CardTitle>
           </CardHeader>
-
-          <CardContent className="pt-6">
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-              ${stats.totalIncome.toFixed(2)}
+          <CardContent>
+            <p className="text-2xl font-bold text-green-600">
+              {formatAmount(stats.totalIncome)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="bg-red-50 dark:bg-red-900/20">
+          <CardHeader>
             <CardTitle>Expenses</CardTitle>
           </CardHeader>
-
-          <CardContent className="pt-6">
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-              ${stats.totalExpenses.toFixed(2)}
+          <CardContent>
+            <p className="text-2xl font-bold text-red-600">
+              {formatAmount(stats.totalExpenses)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="bg-blue-50 dark:bg-blue-900/20">
+          <CardHeader>
             <CardTitle>Balance</CardTitle>
           </CardHeader>
-
-          <CardContent className="pt-6">
-            <p className={`text-2xl font-bold ${
-              stats.balance >= 0
-                ? "text-blue-600 dark:text-blue-400"
-                : "text-red-600 dark:text-red-400"
-            }`}>
-              ${stats.balance.toFixed(2)}
+          <CardContent>
+            <p
+              className={`text-2xl font-bold ${
+                stats.balance >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {formatAmount(stats.balance)}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-100 text-red-800 p-4 rounded-md mb-8">
-          {error}
+      {/* Transaction Form */}
+      <TransactionForm
+        onSuccess={handleTransactionSuccess}
+        trigger={
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Transaction
+          </Button>
+        }
+      />
+
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search transactions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
+            />
+          </div>
         </div>
-      )}
-
-      {/* Filters and Search */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-
-          <Input
-            placeholder="Search transactions..."
-            className="pl-9"
-            value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        <Select
-          value={categoryFilter}
-          onValueChange={setCategoryFilter}
-        >
-          <SelectTrigger className="w-full md:w-[200px]">
-            <SelectValue placeholder="Filter by category" />
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-full md:w-[180px]">
+            <SelectValue placeholder="All Categories" />
           </SelectTrigger>
-
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="income">Income</SelectItem>
-            <SelectItem value="housing">Housing</SelectItem>
-            <SelectItem value="transportation">Transportation</SelectItem>
-            <SelectItem value="food">Food & Dining</SelectItem>
-            <SelectItem value="utilities">Utilities</SelectItem>
-            <SelectItem value="healthcare">Healthcare</SelectItem>
-            <SelectItem value="entertainment">Entertainment</SelectItem>
-            <SelectItem value="education">Education</SelectItem>
-            <SelectItem value="shopping">Shopping</SelectItem>
-            <SelectItem value="personal">Personal Care</SelectItem>
-            <SelectItem value="travel">Travel</SelectItem>
-            <SelectItem value="debt">Debt Payments</SelectItem>
-            <SelectItem value="savings">Savings & Investments</SelectItem>
-            <SelectItem value="gifts">Gifts & Donations</SelectItem>
-            <SelectItem value="other">Other</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
       {/* Transactions Table */}
-      <div className="rounded-md border bg-card">
+      <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead onClick={() => handleSort("date")} className="cursor-pointer">
-                Date
-                {sortField === "date" && (
-                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
-                )}
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSortClick("date")}
+                  className="flex items-center gap-1"
+                >
+                  Date
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
               </TableHead>
-
-              <TableHead
-                onClick={() => handleSort("description")}
-                className="cursor-pointer"
-              >
-                Description
-                {sortField === "description" && (
-                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
-                )}
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSortClick("amount")}
+                  className="flex items-center gap-1"
+                >
+                  Amount
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
               </TableHead>
-
-              <TableHead
-                onClick={() => handleSort("category")}
-                className="cursor-pointer"
-              >
-                Category
-                {sortField === "category" && (
-                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
-                )}
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSortClick("category")}
+                  className="flex items-center gap-1"
+                >
+                  Category
+                  <ArrowUpDown className="h-4 w-4" />
+                </Button>
               </TableHead>
-
-              <TableHead
-                onClick={() => handleSort("amount")}
-                className="cursor-pointer text-right"
-              >
-                Amount
-                {sortField === "amount" && (
-                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
-                )}
-              </TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
-
           <TableBody>
-            {filteredAndSortedTransactions.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  {searchTerm || categoryFilter !== "all"
-                    ? "No matching transactions found."
-                    : "No transactions yet. Add one using the form above."}
+            {sortedTransactions.map((transaction: Transaction) => (
+              <TableRow key={transaction.id}>
+                <TableCell>{formatDate(transaction.date)}</TableCell>
+                <TableCell
+                  className={
+                    transaction.amount >= 0 ? "text-green-600" : "text-red-600"
+                  }
+                >
+                  {formatAmount(transaction.amount)}
+                </TableCell>
+                <TableCell>{transaction.category}</TableCell>
+                <TableCell>{transaction.description}</TableCell>
+                <TableCell className="text-right space-x-2">
+                  <TransactionForm
+                    mode="edit"
+                    transaction={transaction}
+                    onSuccess={handleTransactionSuccess}
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    }
+                  />
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this transaction? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <Form method="post">
+                          <input type="hidden" name="_action" value="deleteTransaction" />
+                          <input type="hidden" name="transactionId" value={transaction.id} />
+                          <AlertDialogAction
+                            type="submit"
+                            onClick={() => {
+                              setTimeout(() => {
+                                handleTransactionSuccess();
+                              }, 100);
+                            }}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </Form>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredAndSortedTransactions.map((transaction: Transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>
-                    {format(parseISO(transaction.date), "MMM dd, yyyy")}
-                  </TableCell>
-
-                  <TableCell>{transaction.description}</TableCell>
-
-                  <TableCell>
-                    <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                      {transaction.category}
-                    </span>
-                  </TableCell>
-
-                  <TableCell className={`text-right font-medium ${
-                    transaction.amount >= 0
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}>
-                    {transaction.amount >= 0 ? "+" : ""}
-                    ${Math.abs(transaction.amount).toFixed(2)}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedTransaction(transaction);
-                        setDeleteDialogOpen(true);
-                      }}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+            ))}
+            {sortedTransactions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-4">
+                  No transactions found.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
@@ -482,15 +568,16 @@ export default function TransactionsPage() {
               Cancel
             </AlertDialogCancel>
             <Form method="post">
-              <input type="hidden" name="transactionId" value={selectedTransaction?.id} />
               <input type="hidden" name="_action" value="deleteTransaction" />
+              <input
+                type="hidden"
+                name="transactionId"
+                value={selectedTransaction?.id}
+              />
               <AlertDialogAction
                 type="submit"
-                onClick={() => {
-                  setDeleteDialogOpen(false);
-                  setSelectedTransaction(null);
-                }}
-                className="bg-red-500 hover:bg-red-600 focus:ring-red-500"
+                onClick={() => setSelectedTransaction(null)}
+                className="bg-red-600 hover:bg-red-700"
               >
                 Delete
               </AlertDialogAction>

@@ -19,7 +19,7 @@
  */
 
 import type { MetaFunction, LoaderFunction } from '@remix-run/node';
-import { requireUser } from '~/lib/supabase.server';
+import { requireUser } from '@/lib/supabase.server';
 
 export const meta: MetaFunction = () => {
   return [
