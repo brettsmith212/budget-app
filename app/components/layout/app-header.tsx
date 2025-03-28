@@ -20,6 +20,7 @@ export default function AppHeader({ user, onLogout }: AppHeaderProps) {
   const tabs = [
     { name: 'Overview', href: '/' },
     { name: 'Transactions', href: '/transactions' },
+    { name: 'Bitcoin', href: '/bitcoin' },
     { name: 'Cash Flow', href: '/cashflow' },
   ];
 
