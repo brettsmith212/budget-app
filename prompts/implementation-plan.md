@@ -126,7 +126,7 @@ app/routes/transactions/index.tsx: Implement a server action to save transaction
 Step Dependencies: Step 3, Step 4
 User Instructions: None
 Bitcoin Transactions
-[ ] Step 8: Implement Bitcoin transaction entry
+[x] Step 8: Implement Bitcoin transaction entry
 Task: Create a form for manually entering Bitcoin transactions and display them with their recorded values.
 Files:
 app/components/forms/bitcoin-form.tsx: Create a form component for entering Bitcoin transactions (amount, date, value).

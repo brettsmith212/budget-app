@@ -5,22 +5,30 @@ import { BitcoinForm } from "@/components/forms/bitcoin-form";
 import { BitcoinTransaction, BitcoinTransactionFormData } from "@/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
+import { getCurrentBitcoinPrice } from "@/lib/bitcoin.server";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { supabase, user } = await requireUser(request);
 
-  const { data: transactions, error } = await supabase
-    .from("bitcoin_transactions")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("date", { ascending: false });
+  const [transactions, currentPrice] = await Promise.all([
+    supabase
+      .from("bitcoin_transactions")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false }),
+    getCurrentBitcoinPrice()
+  ]);
 
-  if (error) {
-    console.error("Error fetching bitcoin transactions:", error);
+  if (transactions.error) {
+    console.error("Error fetching bitcoin transactions:", transactions.error);
     throw new Response("Error fetching transactions", { status: 500 });
   }
 
-  return json({ transactions: transactions || [] }, { headers: {} });
+  return json({ 
+    transactions: transactions.data || [], 
+    currentPrice 
+  }, { headers: {} });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -51,7 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function BitcoinPage() {
-  const { transactions } = useLoaderData<typeof loader>();
+  const { transactions, currentPrice } = useLoaderData<typeof loader>();
 
   const formatCurrency = (value: number | string | null | undefined) => {
     if (value === null || value === undefined) return "N/A";
@@ -65,8 +73,39 @@ export default function BitcoinPage() {
     return num.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 8 });
   };
 
+  // Calculate total BTC and current value
+  const totalBTC = transactions.reduce((sum: number, tx: BitcoinTransaction) => sum + Number(tx.amount), 0);
+  const currentTotalValue = currentPrice ? totalBTC * currentPrice : null;
+
   return (
     <div className="container mx-auto p-4 space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Bitcoin Price</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(currentPrice)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Total Bitcoin</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatBTC(totalBTC)} BTC</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Current Total Value</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(currentTotalValue)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <h1 className="text-2xl font-bold">Bitcoin Transactions</h1>
 
       <BitcoinForm />
@@ -78,7 +117,7 @@ export default function BitcoinPage() {
               <TableHead>Date</TableHead>
               <TableHead>Amount (BTC)</TableHead>
               <TableHead>Value at Purchase (USD)</TableHead>
-              <TableHead>Total Value (USD)</TableHead>
+              <TableHead>Current Value (USD)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -94,7 +133,7 @@ export default function BitcoinPage() {
                   <TableCell>{format(new Date(tx.date + 'T00:00:00'), "PPP")}</TableCell> 
                   <TableCell>{formatBTC(tx.amount)}</TableCell>
                   <TableCell>{formatCurrency(tx.value)}</TableCell>
-                  <TableCell>{formatCurrency(tx.amount * tx.value)}</TableCell>
+                  <TableCell>{formatCurrency(currentPrice ? tx.amount * currentPrice : null)}</TableCell>
                 </TableRow>
               ))
             )}

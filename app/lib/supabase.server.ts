@@ -23,7 +23,10 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { redirect } from '@remix-run/node';
-import { getSession } from './session.server';
+import { getSession as getSessionFromServer } from './session.server';
+
+// Re-export getSession for use in other modules
+export const getSession = getSessionFromServer;
 
 // Initialize Supabase client with environment variables
 const supabaseUrl = process.env.SUPABASE_URL as string;
@@ -99,7 +102,7 @@ export async function getSupabase(request: Request) {
     return { supabase: supabaseClient, user };
   } catch (error) {
     // Handle network errors or timeouts gracefully
-    console.error("Authentication error:", error instanceof Error ? error.message : "Unknown error");
+    console.error("Network error in getSupabase:", error);
     return { supabase: null, user: null };
   }
 }
@@ -111,18 +114,11 @@ export async function getSupabase(request: Request) {
  * @throws Redirect to /auth/login if the user is not authenticated
  */
 export async function requireUser(request: Request) {
-  try {
-    const { supabase, user } = await getSupabase(request);
-    if (!supabase || !user) {
-      throw redirect('/auth/login');
-    }
-    return { supabase, user };
-  } catch (error) {
-    // If there's an error during authentication (like network issues),
-    // log it and redirect to login
-    if (!(error instanceof Response)) {
-      console.error("Authentication error in requireUser:", error instanceof Error ? error.message : "Unknown error");
-    }
+  const { supabase, user } = await getSupabase(request);
+  
+  if (!supabase || !user) {
     throw redirect('/auth/login');
   }
+
+  return { supabase, user };
 }
