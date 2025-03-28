@@ -125,7 +125,7 @@ export default function TransactionForm({
   useEffect(() => {
     // Check for success from either the fetcher or actionData
     const isSuccess = (fetcher.data as ActionState<TransactionFormData>)?.isSuccess || actionData?.isSuccess;
-    
+
     if (isSuccess) {
       // Call onSuccess callback after a short timeout to ensure dialog is closed first
       if (onSuccess) {
@@ -153,14 +153,14 @@ export default function TransactionForm({
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        <fetcher.Form 
-          method="post" 
+        <fetcher.Form
+          method="post"
           className="space-y-6"
           onSubmit={() => {
             // Close the dialog as soon as form is submitted
             // Since we're using redirect in the action, we need to close the modal right away
             setOpen(false);
-            
+
             // Reset form fields for create mode to ensure fresh form on next open
             if (mode === "create") {
               setDate(new Date());
@@ -225,18 +225,17 @@ export default function TransactionForm({
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
-                      variant="outline"
+                      variant={"outline"}
                       className={cn(
                         "w-full justify-start text-left font-normal",
                         !date && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, "PPP") : "Select date"}
+                      {date ? format(date, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
-
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent className="w-auto p-0" align="start" side="bottom">
                     <Calendar
                       mode="single"
                       selected={date}
@@ -259,12 +258,12 @@ export default function TransactionForm({
                       className="w-full justify-between"
                     >
                       {category
-                        ? categories.find((cat) => cat.value === category)?.label
+                        ? categories.find((c) => c.value === category)?.label
                         : "Select category..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
+                  <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0" align="start" side="bottom">
                     <Command>
                       <CommandInput placeholder="Search category..." />
                       <CommandEmpty>No category found.</CommandEmpty>
@@ -315,8 +314,8 @@ export default function TransactionForm({
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isSubmitting}
                 onClick={() => {
                   // Close the modal when clicking submit
